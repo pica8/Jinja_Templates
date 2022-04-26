@@ -1,0 +1,90 @@
+name: S4128T-ON-DEFAULT
+description: S4128T-ON default template
+platform: S4128T-ON
+content_start:
+
+
+set vlans vlan-id {{ Data_VLAN_list.split(';')|join(',') }} vlan-name {{ Vlan_Name }}  
+set vlans vlan-id {{ Data_VLAN_list.split(';')|join(',') }} l3-interface vlan{{ Data_VLAN_list.split(';')|join(',') }}  
+
+{#:::::For ae interfaces  :::::#}
+
+set interface aggregate-ethernet ae1 family ethernet-switching vlan members {{ Data_VLAN_list.split(';')|join(',') }}
+set interface aggregate-ethernet ae28 family ethernet-switching vlan members {{ Data_VLAN_list.split(';')|join(',') }}
+
+
+{#:::::For Dhcp Relay  :::::#}
+
+set protocols dhcp relay vlan-interface vlan{{ Data_VLAN_list.split(';')|join(',') }} disable false
+set protocols dhcp relay vlan-interface vlan{{ Data_VLAN_list.split(';')|join(',') }} dhcp-server-address1 10.226.32.35
+set protocols dhcp relay vlan-interface vlan{{ Data_VLAN_list.split(';')|join(',') }} dhcp-server-address2 10.67.13.147
+set protocols dhcp relay vlan-interface vlan{{ Data_VLAN_list.split(';')|join(',') }} dhcp-server-address3 10.67.202.72 
+
+
+{#:::::For VRRP   :::::#}
+
+set protocols vrrp interface vlan{{ Data_VLAN_list.split(';')|join(',') }} vif vlan{{ Data_VLAN_list.split(';')|join(',') }} vrid {{ Vrrp_id }} ip {{ Vrrp_ip }} 
+set protocols vrrp interface vlan{{ Data_VLAN_list.split(';')|join(',') }} vif vlan{{ Data_VLAN_list.split(';')|join(',') }} vrid {{ Vrrp_id }} load-balance disable false
+
+
+{#:::::For L3 Vlan Ip :::::#}
+
+set vlan-interface interface vlan{{ Data_VLAN_list.split(';')|join(',') }} vif vlan{{ Data_VLAN_list.split(';')|join(',') }} address {{ Vlan_ip }}  prefix-length 24
+ 
+  
+
+
+
+{{ Other_set_Commands }}
+
+
+
+content_end$
+param_start:
+{
+	"Data_VLAN_list": {
+		"param_default": "",
+		"type": "text",
+		"required": "required",
+		"description": "Configure Data VLAN will be connected by VXLAN, e.g. 300;301;302",
+		"param_check": ""
+	},
+	"Vlan_Name": {
+		"param_default": "",
+		"type": "text",
+		"required": "not required",
+		"description": "Enter the Vlan name, or leave blank to remove it",
+		"param_check": ""
+	},
+       "Vrrp_id": {
+		"param_default": "",
+		"type": "text",
+		"required": "required",
+		"description": "Configure Vrrp ID e.g. 1;2",
+		"param_check": ""
+	},
+      "Vrrp_ip": {
+		"param_default": "",
+		"type": "text",
+		"required": "required",
+		"description": "Configure Vrrp IP e.g. 10.226.1.254",
+		"param_check": ""
+	},
+      "Vlan_ip": {
+		"param_default": "",
+		"type": "text",
+		"required": "required",
+		"description": "Configure L3 Vlan Ip e.g. 10.226.1.2",
+		"param_check": ""
+	},
+	"Other_set_Commands": {
+		"param_default": "",
+		"type": "textarea",
+		"required": "not required",
+		"description": "Any set commands you wish to apply to the switch configuration",
+		"param_check": ""
+	}
+}
+
+
+param_end$
