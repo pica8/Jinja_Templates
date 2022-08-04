@@ -1,0 +1,108 @@
+name: My_Access_Template
+description: Access Switch Template - Zero-Trust
+platform: N2248PX-ON
+content_start:
+
+{#::::: For input Variable::::#}
+set system hostname {{ Hostname }}
+set l3-interface vlan-interface Vlan10 address {{VLAN10_Address}} prefix-length {{VLAN10_Prefix_Length}}
+set protocols sflow agent-id {{VLAN10_Address}}
+set protocols sflow source-address {{VLAN10_Address}}
+set protocols dot1x aaa radius nas-ip {{VLAN10_Address}}
+
+
+{#::::: Basic Management config::::#}
+set protocols static route 0.0.0.0/0 next-hop {{ Default_gateway }}
+{#::::: set protocols dot1x aaa radius nas-ip {{Management_IP_Address_Mask.split('/')[0]}} ::::#}
+set system management-ethernet eth0 ip-address IPv4 {{Management_IP_Address_Mask.split('/')[0]}}/{{Management_IP_Address_Mask.split('/')[1]}}
+set system management-ethernet eth0 ip-gateway IPv4 {{ Default_MGMT_gateway }}
+
+{#:::::For ports 1/1/2 through 1/1/48:data vlan 10 ::::#}
+{% for  i in range(2,49) %}
+set interface gigabit-ethernet ge-1/1/{{ i }} description ""
+set interface gigabit-ethernet ge-1/1/{{ i }} mtu 1514
+set interface gigabit-ethernet ge-1/1/{{ i }} disable false
+set interface gigabit-ethernet ge-1/1/{{ i }} power-preemphasis-level 0
+set interface gigabit-ethernet ge-1/1/{{ i }} snmp-trap true
+set interface gigabit-ethernet ge-1/1/{{ i }} loopback false
+set interface gigabit-ethernet ge-1/1/{{ i }} mac-learning true
+set interface gigabit-ethernet ge-1/1/{{ i }} family ethernet-switching port-mode "trunk"
+
+set protocols dot1x interface ge-1/1/{{ i }} host-mode "multiple"
+set protocols dot1x interface ge-1/1/{{ i }} recovery-timeout 3600
+set protocols dot1x interface ge-1/1/{{ i }} session-timeout 3600
+set protocols dot1x interface ge-1/1/{{ i }} auth-mode 802.1x
+set protocols dot1x interface ge-1/1/{{ i }} auth-mode mac-radius
+set protocols dot1x traceoptions interface ge-1/1/{{ i }} flag all
+{% endfor %}
+
+{% for  i in range(1,5) %}
+set interface gigabit-ethernet te-1/1/{{ i }} snmp-trap true
+set interface gigabit-ethernet te-1/1/{{ i }} loopback false
+set interface gigabit-ethernet te-1/1/{{ i }} mac-learning true
+set interface gigabit-ethernet te-1/1/{{ i }} power-preemphasis-level 0
+set interface gigabit-ethernet te-1/1/{{ i }} speed "10000"
+set interface gigabit-ethernet te-1/1/{{ i }} description ""
+set interface gigabit-ethernet te-1/1/{{ i }} mtu 2000
+{% endfor %}
+
+{% for  i in range(1,3) %}
+set interface gigabit-ethernet xe-1/1/{{ i }} description ""
+set interface gigabit-ethernet xe-1/1/{{ i }} mtu 1514
+set interface gigabit-ethernet xe-1/1/{{ i }} disable false
+set interface gigabit-ethernet xe-1/1/{{ i }} power-preemphasis-level 0
+set interface gigabit-ethernet xe-1/1/{{ i }} snmp-trap true
+set interface gigabit-ethernet xe-1/1/{{ i }} loopback false
+set interface gigabit-ethernet xe-1/1/{{ i }} mac-learning true
+{% endfor %}
+
+
+
+content_end$
+param_start:
+{
+	"Hostname": {
+		"param_default": "EVPN-ACC3",
+		"type": "text",
+		"required": "not required",
+		"description": "Configure the hostname",
+		"param_check": ""
+	},
+	"VLAN10_Address": {
+		"param_default": "10.10.10.X",
+		"type": "text",
+		"required": "required",
+		"description": "Configure VLAN 10 routed address",
+		"param_check": ""
+	},
+	"VLAN10_Prefix_Length": {
+		"param_default": "24",
+		"type": "text",
+		"required": "required",
+		"description": "VLAN 10 Subnet two-digit CIDR prefix",
+		"param_check": ""
+	},
+	"Management_IP_Address_Mask": {
+		"param_default": "172.10.10.250/24",
+		"type": "text",
+		"required": "required",
+		"description": "Configure management IP mask.e.g. 192.168.42.42/24",
+		"param_check": ""
+	},
+	"Default_MGMT_gateway": {
+		"param_default": "172.10.10.240",
+		"type": "IPv4",
+		"required": "required",
+		"description": "Configure the default gateway e.g 192.168.42.1",
+		"param_check": ""
+	},
+	"Default_gateway": {
+		"param_default": "10.10.10.1",
+		"type": "IPv4",
+		"required": "required",
+		"description": "static route 0.0.0.0/0 next-hop default gateway e.g 192.168.42.1",
+		"param_check": ""
+	}
+}
+
+param_end$
