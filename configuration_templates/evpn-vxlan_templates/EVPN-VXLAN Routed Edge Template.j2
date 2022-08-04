@@ -1,0 +1,272 @@
+name: EVPN-VXLAN_Routed_Edge_Template
+description: EVPN Routed Edge Template
+platform: N2248PX-ON
+content_start:
+
+{#::::: Template Portions Courtsey of ::::#}
+{#::::: TRACE3, Inc. ::::#}
+{#::::: Pica8, Inc. ::::#}
+
+{#::::: General Config ::::#}
+set system hostname {{ Hostname }}
+set interface cut-through-mode false
+set system management-ethernet eth0 ip-address IPv4 {{Management_IP_Address_Mask.split('/')[0]}}/{{Management_IP_Address_Mask.split('/')[1]}}
+set system management-ethernet eth0 ip-gateway IPv4 {{ Default_MGMT_gateway }}
+set protocols lldp enable true
+
+{#::::: Enable ZTNA FOR ALL PORTS ::::#}
+{% for i in range(1,49) %}
+set interface gigabit-ethernet ge-1/1/{{ i }} family ethernet-switching port-mode "trunk"
+set interface gigabit-ethernet ge-1/1/{{ i }} snmp-trap true
+set interface gigabit-ethernet ge-1/1/{{ i }} mac-learning true
+set protocols dot1x interface ge-1/1/{{ i }} host-mode "multiple"
+set protocols dot1x interface ge-1/1/{{ i }} auth-mode 802.1x
+set protocols dot1x interface ge-1/1/{{ i }} auth-mode mac-radius
+set protocols dot1x interface ge-1/1/{{ i }} auth-mode web
+set protocols dot1x interface ge-1/1/{{ i }} recovery-timeout 3600
+set protocols dot1x interface ge-1/1/{{ i }} session-timeout 3600
+set protocols dot1x traceoptions interface ge-1/1/{{ i }} flag all
+{% endfor %}
+
+{#:::::For VLANs 1 through X Map VNIs Y through Z ::::#}
+{% for i in range(10,50,10) %}
+set vlans vlan-id {{i}}
+set vxlans vni 100{{i}} decapsulation mode "service-vlan-per-port" 
+set vxlans vni 100{{i}} vlan {{i}}
+{% if loop.index == loop.length %}
+set protocols dot1x block-vlan-id {{i}}
+set vlans vlan-id {{ i }} l3-interface "vlan{{ i }}"
+set l3-interface vlan-interface vlan{{ i }} description "Punishment_VLAN"
+set l3-interface vlan-interface vlan{{ i }} address {{ PunishmentVLAN_IP }} prefix-length 24
+{% endif %}
+{% endfor %}
+set vxlans source-interface lo address {{ Loopback0_IP }}
+
+{#::::: Configure BGP ::::#}
+set protocols bgp local-as {{ Spine_ASN }}
+set protocols bgp router-id {{ Loopback0_IP }}
+set protocols bgp ebgp-requires-policy false
+set protocols bgp peer-group {{ Underlay_BGP_Group }} 
+set protocols bgp peer-group {{ Underlay_BGP_Group }} remote-as external
+set protocols bgp peer-group {{ Underlay_BGP_Group }} ipv4-unicast soft-reconfiguration inbound
+set protocols bgp listen range {{ Underlay_P2P_Subnet }} peer-group {{ Underlay_BGP_Group }}
+set protocols bgp ipv4-unicast redistribute connected route-map "RM_Connected_To_BGP"
+
+set protocols bgp peer-group {{ Overlay_BGP_Group }} evpn activate true
+set protocols bgp peer-group {{ Overlay_BGP_Group }} remote-as external
+set protocols bgp peer-group {{ Overlay_BGP_Group }} update-source {{ Loopback0_IP }}
+set protocols bgp listen range {{ Loopback0_Subnet }} peer-group {{ Overlay_BGP_Group }}
+set protocols bgp evpn advertise-all-vni
+set protocols bgp evpn advertise-default-gw
+
+{#::::: Enable ECMP ::::#}
+set interface ecmp max-path {{ ECMP_Number }}
+set interface ecmp hash-mapping field ingress-interface disable true
+set interface ecmp hash-mapping field vlan disable true
+set interface ecmp hash-mapping field ip-protocol disable true
+set interface ecmp hash-mapping field ip-source disable false
+set interface ecmp hash-mapping field ip-destination disable false
+set interface ecmp hash-mapping field port-source disable false
+set interface ecmp hash-mapping field port-destination disable false
+set interface ecmp hash-mapping symmetric false
+
+{#::::: Configure Point to Point Interfaces ::::#}
+set interface gigabit-ethernet {{ Spine_to_Leaf1_Interface }} description ""
+set interface gigabit-ethernet {{ Spine_to_Leaf1_Interface }} mtu 9216
+set interface gigabit-ethernet {{ Spine_to_Leaf1_Interface }} disable false
+set interface gigabit-ethernet {{ Spine_to_Leaf1_Interface }} ether-options flow-control false
+set interface gigabit-ethernet {{ Spine_to_Leaf1_Interface }} ether-options 802.3ad "ae11"
+set interface gigabit-ethernet {{ Spine_to_Leaf1_Interface }} snmp-trap true
+set interface gigabit-ethernet {{ Spine_to_Leaf1_Interface }} loopback false
+set interface gigabit-ethernet {{ Spine_to_Leaf1_Interface }} mac-learning true
+{% if Spine_to_Leaf1_Int_Speed|length %}
+set interface gigabit-ethernet {{ Spine_to_Leaf1_Interface }} speed {{ Spine_to_Leaf1_Int_Speed }}
+{%endif%}
+set interface gigabit-ethernet {{ Spine_to_Leaf1_Interface }} family ethernet-switching native-vlan-id {{ Leaf1_P2P_VLAN }}
+set interface gigabit-ethernet {{ Spine_to_Leaf1_Interface }} family ethernet-switching port-mode access
+
+set interface gigabit-ethernet {{ Spine_to_Leaf2_Interface }} description ""
+set interface gigabit-ethernet {{ Spine_to_Leaf2_Interface }} mtu 9216
+set interface gigabit-ethernet {{ Spine_to_Leaf2_Interface }} disable false
+set interface gigabit-ethernet {{ Spine_to_Leaf2_Interface }} ether-options flow-control false
+set interface gigabit-ethernet {{ Spine_to_Leaf2_Interface }} ether-options 802.3ad "ae11"
+set interface gigabit-ethernet {{ Spine_to_Leaf2_Interface }} snmp-trap true
+set interface gigabit-ethernet {{ Spine_to_Leaf2_Interface }} loopback false
+set interface gigabit-ethernet {{ Spine_to_Leaf2_Interface }} mac-learning true
+{% if Spine_to_Leaf2_Int_Speed|length %}
+set interface gigabit-ethernet {{ Spine_to_Leaf2_Interface }} speed {{ Spine_to_Leaf2_Int_Speed }}
+{%endif%}
+set interface gigabit-ethernet {{ Spine_to_Leaf2_Interface }} family ethernet-switching native-vlan-id {{ Leaf2_P2P_VLAN }}
+set interface gigabit-ethernet {{ Spine_to_Leaf2_Interface }} family ethernet-switching port-mode access
+
+{#::::: Configure VLAN and SVI for P2P Interface ::::#}
+set vlans vlan-id {{ Leaf1_P2P_VLAN }} vlan-name "Spine_to_Leaf1"
+set vlans vlan-id {{ Leaf1_P2P_VLAN }} description "Spine_to_Leaf1_L3"
+set vlans vlan-id {{ Leaf1_P2P_VLAN }} l3-interface "vlan{{ Leaf1_P2P_VLAN }}"
+
+set l3-interface vlan-interface vlan{{ Leaf1_P2P_VLAN }} description "Spine_to_Leaf1_L3"
+set l3-interface vlan-interface vlan{{ Leaf1_P2P_VLAN }} address {{ Spine_to_leaf1_IP.split('/')[0] }} prefix-length {{ Spine_to_leaf1_IP.split('/')[1]}}
+set l3-interface vlan-interface vlan{{ Leaf1_P2P_VLAN }} mtu 9000
+
+set vlans vlan-id {{ Leaf2_P2P_VLAN }} vlan-name "Spine_to_Leaf1"
+set vlans vlan-id {{ Leaf2_P2P_VLAN }} description "Spine_to_Leaf1_L3"
+set vlans vlan-id {{ Leaf2_P2P_VLAN }} l3-interface "vlan{{ Leaf2_P2P_VLAN }}"
+
+set l3-interface vlan-interface vlan{{ Leaf2_P2P_VLAN }} description "Spine_to_Leaf1_L3"
+set l3-interface vlan-interface vlan{{ Leaf2_P2P_VLAN }} address {{ Spine_to_leaf2_IP.split('/')[0] }} prefix-length {{ Spine_to_leaf2_IP.split('/')[1]}}
+set l3-interface vlan-interface vlan{{ Leaf2_P2P_VLAN }} mtu 9000
+
+{#::::: Configure LAG Groups ::::#}
+set interface aggregate-ethernet ae11 aggregated-ether-options lacp enable true
+set interface aggregate-ethernet ae11 family ethernet-switching port-mode "trunk"
+set interface aggregate-ethernet ae11 family ethernet-switching vlan members 10,20,30,40
+
+{#::::: Configure Loopbacks ::::#}
+set l3-interface loopback lo address {{ Loopback0_IP }} prefix-length 32
+
+{#::::: Configure route-map to advertise Loopbacks ::::#}
+set routing prefix-list ipv4-family loopbacks permit prefix {{ Loopback0_Subnet }} ge 32
+set routing route-map RM_Connected_To_BGP order 10 matching-policy "permit"
+set routing route-map RM_Connected_To_BGP order 10 match ipv4-addr address prefix-list "loopbacks"
+
+
+content_end$
+
+{#::::: Input form information ::::#}
+param_start:
+{
+	"Hostname": {
+		"param_default": "EVPN-XXXXX",
+		"type": "text",
+		"required": "not required",
+		"description": "Configure the hostname",
+		"param_check": ""
+	},
+	"Management_IP_Address_Mask": {
+		"param_default": "172.10.10.250/24",
+		"type": "text",
+		"required": "required",
+		"description": "Configure management IP mask.e.g. 192.168.42.42/24",
+		"param_check": ""
+	},
+	"Default_MGMT_gateway": {
+		"param_default": "172.10.10.240",
+		"type": "IPv4",
+		"required": "required",
+		"description": "Configure the default gateway e.g 192.168.42.1",
+		"param_check": ""
+	},
+	"ECMP_Number": {
+		"param_default": "4",
+		"type": "text",
+		"required": "not required",
+		"description": "Configure the number of ECMP paths",
+		"param_check": ""
+	},
+    "Leaf1_P2P_VLAN": {
+		"param_default": "4000",
+		"type": "text",
+		"required": "required",
+		"description": "Configure the VLAN used between the Spine and Leaf1 e.g. 4000",
+		"param_check": ""
+	},
+	"Spine_to_Leaf1_Interface": {
+		"param_default": "",
+		"type": "text",
+		"required": "required",
+		"description": "Configure the Spine interface connected to Leaf1 e.g. te-1/1/3",
+		"param_check": ""
+	},
+	"Spine_to_Leaf1_Int_Speed": {
+		"param_default": "",
+		"type": "text",
+		"required": "required",
+		"description": "Configure the Spine interface speed connected to Leaf1 e.g. 10000",
+		"param_check": ""
+	},
+	"Spine_to_leaf1_IP": {
+		"param_default": "",
+		"type": "text",
+		"required": "required",
+		"description": "Configure the IP between Spine and Leaf1 e.g. 192.168.0.1/31",
+		"param_check": ""
+	},
+	"Leaf2_P2P_VLAN": {
+		"param_default": "4001",
+		"type": "text",
+		"required": "required",
+		"description": "Configure the VLAN used between the Spine and Leaf2 e.g. 4001",
+		"param_check": ""
+	},
+	"Spine_to_Leaf2_Interface": {
+		"param_default": "",
+		"type": "text",
+		"required": "required",
+		"description": "Configure the Spine interface connected to Leaf2 e.g. te-1/1/3",
+		"param_check": ""
+	},
+		"Spine_to_Leaf2_Int_Speed": {
+		"param_default": "",
+		"type": "text",
+		"required": "required",
+		"description": "Configure the Spine interface speed connected to Leaf2 e.g. 10000",
+		"param_check": ""
+	},
+	"Spine_to_leaf2_IP": {
+		"param_default": "",
+		"type": "text",
+		"required": "required",
+		"description": "Configure the IP between Spine and Leaf2 e.g. 192.168.0.1/31",
+		"param_check": ""
+	},
+	"Loopback0_Subnet": {
+		"param_default": "",
+		"type": "text",
+		"required": "required",
+		"description": "Configure the subnet used for Loopback0 e.g. 10.0.0.0/24",
+		"param_check": ""
+	},
+	"Loopback0_IP": {
+		"param_default": "",
+		"type": "IPv4",
+		"required": "required",
+		"description": "Configure the Loopback0_IP e.g. 10.0.0.1",
+		"param_check": ""
+	},
+	"PunishmentVLAN_IP": {
+		"param_default": "",
+		"type": "IPv4",
+		"required": "required",
+		"description": "Configure the PunishmentVLAN_IP e.g. 10.66.66.1",
+		"param_check": ""
+	},
+	"Spine_ASN": {
+		"param_default": "65500",
+		"type": "text",
+		"required": "required",
+		"description": "Configure the BGP ASN for the Spine e.g. 65500",
+		"param_check": ""
+	},
+	"Underlay_BGP_Group": {
+		"param_default": "Underlay_Leafs",
+		"type": "text",
+		"required": "required",
+		"description": "Configure the underlay BGP peer group e.g Underlay_Leafs",
+		"param_check": ""
+	},
+	"Underlay_P2P_Subnet": {
+		"param_default": "",
+		"type": "text",
+		"required": "required",
+		"description": "Configure the subnet used for underlay P2P connections e.g. 172.16.0.0/24",
+		"param_check": ""
+	},
+	"Overlay_BGP_Group": {
+		"param_default": "Overlay_Leafs",
+		"type": "text",
+		"required": "required",
+		"description": "Configure the overlay BGP peer group e.g Overlay_Leafs",
+		"param_check": ""
+	}
+}
+param_end$

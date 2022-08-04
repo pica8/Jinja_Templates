@@ -1,0 +1,146 @@
+name: Point_And_Click_VXLAN_CORE_ROUTER
+description: VXLAN_CORE_ROUTER
+platform: N2248PX-ON
+content_start:
+
+set l3-interface loopback lo address 10.1.1.202 prefix-length 32
+set l3-interface loopback lo address 10.1.1.254 prefix-length 32
+set protocols bgp local-as {{ local_as }}
+set protocols bgp router-id {{ bgp_router_id0 }}
+set protocols bgp peer-group RR remote-as "{{ bgp_remoteas_label1 }}"
+set protocols bgp peer-group RR update-source "{{ bgp_updatesrc_label1 }}" 
+set protocols bgp peer-group RR evpn activate true 
+set protocols bgp neighbor {{ bgp_neighbor_ip1 }} peer-group "RR" 
+set protocols bgp neighbor {{ bgp_neighbor_ip2 }}  peer-group "RR" 
+set protocols mlag domain {{ domain }} node {{ node }}
+set protocols mlag domain {{ domain }} peer-ip {{ peer_ip }} peer-link {{ peer_link }}
+set protocols mlag domain {{ domain }} peer-ip {{ peer_ip }} peer-vlan {{ peer_vlan }}
+set protocols mlag {{ domain }} interface {{mlag_agg_eth_interface1}} link {{mlag_linkid1}} 
+set protocols mlag {{ domain }} interface {{mlag_agg_eth_interface2}} link {{mlag_linkid2}}
+set protocols ospf router-id {{ ospf_router_id0 }}
+set protocols ospf auto-cost reference-bandwidth {{ ospf_ref_bwidth }} 
+set protocols ospf network {{ ospf_network0 }} area {{ ospf_area0 }}  
+set protocols ospf vrf {{ ospf_vrf0_name }} router-id {{ ospf_vrf0_router_id0 }} 
+set protocols ospf vrf {{ ospf_vrf0_name }} auto-cost reference-bandwidth {{ ospf_ref_bwidth }}  
+set protocols ospf vrf {{ ospf_vrf0_name }} network {{ ospf_vrf0_network0 }} area {{ ospf_area0 }}  
+
+{#:::::For VLANs 1 through X Map VNIs Y through Z ::::#}
+{% for i in range(10,30,10) %}
+set vxlans vni 100{{i}} decapsulation mode "service-vlan-per-port" 
+set vxlans vni 100{{i}} vlan {{i}} 
+{% endfor %}
+
+content_end$
+param_start:
+{
+	"bgp_router_id0": {
+		"param_default": "",
+		"type": "IPv4",
+		"description": "A unique iBGP Router IP Address identifier within this local iBGP",
+		"param_check": ""
+	},
+    "bgp_neighbor_ip1": {
+		"param_default": "",
+		"type": "IPv4",
+		"description": "BGP Neighbor IP 1: A unique IP address identifier within this AS",
+		"param_check": ""
+	},
+    "bgp_neighbor_ip2": {
+		"param_default": "",
+		"type": "IPv4",
+		"description": "BGP Neighbor IP 2: A unique IP address identifier within this AS",
+		"param_check": ""
+	},
+	"node": {
+		"param_default": "",
+		"type": "int",
+		"description": "MLAG Node ID",
+		"param_check": "[0..1]"
+	},
+	"domain": {
+		"param_default": "",
+		"type": "int",
+		"description": "MLAG Domain ID",
+		"param_check": "[1..255]"
+	},
+	"peer_link": {
+		"param_default": "",
+		"type": "text",
+		"description": "The interface which connects to peer 1",
+		"param_check": ""
+	},
+	"peer_vlan": {
+		"param_default": "",
+		"type": "int",
+		"description": "The MLAG peering control-plane VLAN Number",
+		"param_check": "[1..4094]"
+	},
+	"peer_ip": {
+		"param_default": "",
+		"type": "ipv4",
+		"description": "The IP address of peer 1",
+		"param_check": ""
+	},
+	"local_as": {
+		"param_default": "",
+		"type": "text",
+		"description": "iBGP Local AS number, e.g. <0..65535>",
+		"param_check": ""
+	},
+    "bgp_remoteas_label1": {
+		"param_default": "",
+		"type": "text",
+		"description": "BGP Remote AS Name",
+		"param_check": ""
+	},
+    "bgp_updatesrc_label1": {
+		"param_default": "",
+		"type": "text",
+		"description": "BGP Update Source Name",
+		"param_check": ""
+	},
+	"ospf_router_id0": {
+		"param_default": "",
+		"type": "IPv4",
+		"description": "IP identifier for this OSPF Area",
+		"param_check": ""
+	},
+    "ospf_vrf0_router_id0": {
+		"param_default": "",
+		"type": "IPv4",
+		"description": "IP identifier for/within this OSPF VRF Area 0",
+		"param_check": ""
+	},
+    "ospf_area0": {
+		"param_default": "",
+		"type": "int",
+		"description": "OSPF Area Number",
+		"param_check": "[0..100000000]"
+	},
+    "ospf_network0": {
+		"param_default": "",
+		"type": "IPv4",
+		"description": "OSPF Network to Add to routing: IPv4 Network identifier within this OSPF Area",
+		"param_check": ""
+	},
+     "ospf_vrf0_network0": {
+		"param_default": "",
+		"type": "IPv4",
+		"description": "OSPF VRF Network to Add to routing: IPv4 Network identifier within this OSPF Area",
+		"param_check": ""
+	},
+    "ospf_vrf0_name": {
+		"param_default": "",
+		"type": "text",
+		"description": "OSPF VRF Name",
+		"param_check": ""
+	},
+    "ospf_ref_bwidth": {
+		"param_default": "",
+		"type": "int",
+		"description": "OSPF Reference Bandwidth",
+		"param_check": "[1..100000000]"
+	}
+    
+}
+param_end$
