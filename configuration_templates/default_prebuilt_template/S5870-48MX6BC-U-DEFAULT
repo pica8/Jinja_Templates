@@ -1,5 +1,5 @@
-name: S5870-48MX6BC
-description: S5870-48MX6BC-DEFAULT
+name: S5870-48MX6BC-U-DEFAULT
+description: S5870-48MX6BC-U-DEFAULT
 content_start:
 set vlans vlan-id {{ Data_VLAN_list.split(';')|join(',') }} vlan-name "{{ Vlan_Name }}"  
 set vlans vlan-id {{ Data_VLAN_list.split(';')|join(',') }} l3-interface vlan{{ Data_VLAN_list.split(';')|join(',') }}  
@@ -56,7 +56,7 @@ param_start:
     "description": "Enter the Vlan name, or leave blank to remove it",
     "param_check": "",
     "param_default": "",
-    "required": "not required",
+    "required": "required",
     "type": "text"
   },
   "Vlan_ip": {
